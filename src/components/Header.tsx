@@ -40,11 +40,17 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, className }) => {
         >
           <span className="sr-only">Toggle menu</span>
         </Button>
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-luna-500 flex items-center justify-center">
-            <span className="text-white font-medium">L</span>
+        
+        <div className="flex items-center space-x-3">
+          <img 
+            src="/lovable-uploads/68ca9d66-c2ef-4e4e-8ff9-a87c0fe7c58c.png" 
+            alt="Luna Logo" 
+            className="w-10 h-10 rounded-full"
+          />
+          <div className="flex flex-col">
+            <span className="font-medium text-xs md:text-sm">AUTOMATED AI DEVELOPMENT ORCHESTRATION TOOL</span>
+            <span className="text-xs text-muted-foreground">from LunaTech AI Development by Norman dela Paz Tabora</span>
           </div>
-          <span className="font-medium text-xl">Luna</span>
         </div>
       </div>
       
