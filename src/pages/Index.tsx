@@ -45,6 +45,9 @@ const Index = () => {
     }
   };
 
+  // The correct way to handle media queries in inline styles is to use CSS classes instead
+  const mainClasses = `flex-1 pt-16 transition-all duration-300 ${showSidebar ? 'md:ml-64' : 'ml-0'}`;
+
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-background to-secondary">
       <Header toggleSidebar={toggleSidebar} />
@@ -54,15 +57,7 @@ const Index = () => {
         activeTab={activeTab} 
       />
       
-      <main 
-        className="flex-1 pt-16 transition-all duration-300" 
-        style={{ 
-          marginLeft: showSidebar ? '16rem' : '0',
-          '@media (max-width: 768px)': {
-            marginLeft: '0',
-          },
-        }}
-      >
+      <main className={mainClasses}>
         <div className="h-[calc(100vh-4rem)]">
           {renderContent()}
         </div>

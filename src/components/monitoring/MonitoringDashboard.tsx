@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { CpuIcon, Memory, Globe, Clock, Database, Zap, FileText, User, RotateCcw } from 'lucide-react';
+import { CpuIcon, HardDrive, Globe, Clock, Database, Zap, FileText, User, RotateCcw } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 
@@ -59,7 +58,7 @@ const MonitoringDashboard: React.FC = () => {
         <Card className="glass p-4">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <Memory size={20} className="text-purple-500" />
+              <HardDrive size={20} className="text-purple-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Memory Usage</p>
