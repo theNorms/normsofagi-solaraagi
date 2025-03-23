@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Save, Workflow, Database, MessageCircle, FileText, ArrowRight } from 'lucide-react';
 import Card from '../common/Card';
@@ -62,8 +61,6 @@ const WorkflowCreator: React.FC = () => {
     setSelectedNode(id === selectedNode ? null : id);
   };
 
-  // This is a simplified version, in a real app we would use a library like reactflow
-  // to create proper draggable nodes and connections
   return (
     <div className="h-full flex flex-col space-y-6 p-6 overflow-auto">
       <div className="flex items-center justify-between">
@@ -126,7 +123,6 @@ const WorkflowCreator: React.FC = () => {
         <div className="md:col-span-3">
           <Card className="glass h-full min-h-[400px] relative">
             <div className="absolute inset-0 p-6">
-              {/* Simple visual representation of connections */}
               <svg className="w-full h-full absolute top-0 left-0 pointer-events-none">
                 {connections.map((connection) => {
                   const source = nodes.find((n) => n.id === connection.source);
@@ -162,7 +158,6 @@ const WorkflowCreator: React.FC = () => {
                 })}
               </svg>
               
-              {/* Nodes */}
               {nodes.map((node) => (
                 <div
                   key={node.id}
@@ -228,8 +223,9 @@ const WorkflowCreator: React.FC = () => {
                   </div>
                 ))}
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
