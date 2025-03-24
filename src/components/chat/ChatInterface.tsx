@@ -26,11 +26,24 @@ const ChatInterface: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
   
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     scrollToBottom();
+    
+    // Listen for dark mode changes
+    const observer = new MutationObserver(() => {
+      setDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    
+    return () => observer.disconnect();
   }, [messages]);
 
   const scrollToBottom = () => {
@@ -140,7 +153,10 @@ const ChatInterface: React.FC = () => {
                 handleSendMessage();
               }
             }}
-            className="flex-1"
+            className={cn(
+              "flex-1",
+              darkMode && "text-blue-300 placeholder:text-blue-500/60"
+            )}
           />
           
           <Button
