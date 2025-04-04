@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
@@ -6,6 +7,7 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 import AnimatedTransition from '../common/AnimatedTransition';
 import { talkToSolara } from '@/api/solara';
+import { logService } from '../monitoring/LogMonitor';
 
 interface Message {
   id: string;
@@ -65,6 +67,9 @@ const ChatInterface: React.FC = () => {
     setInputValue('');
     setIsProcessing(true);
     
+    // Log the message to the monitoring system
+    logService.addLog(`Sending user message: "${inputValue.substring(0, 50)}${inputValue.length > 50 ? '...' : ''}"`, 'info', 'chat');
+    
     try {
       const reply = await talkToSolara(userMessage.content);
       
@@ -76,8 +81,17 @@ const ChatInterface: React.FC = () => {
       };
       
       setMessages(prev => [...prev, solaraMessage]);
+      
+      // Log the response to the monitoring system
+      if (reply.includes("unavailable") || reply.includes("issues") || reply.includes("failed")) {
+        logService.addLog(`API response issue: ${reply.substring(0, 100)}`, 'warning', 'api');
+      } else {
+        logService.addLog(`Received response from Solara`, 'success', 'api');
+      }
     } catch (error) {
       console.error("API Error:", error);
+      logService.addLog(`API error: ${error instanceof Error ? error.message : String(error)}`, 'error', 'api');
+      
       setMessages(prev => [...prev, {
         id: (Date.now() + 2).toString(),
         content: "Sorry, I'm having trouble reaching the orchestrator.",
