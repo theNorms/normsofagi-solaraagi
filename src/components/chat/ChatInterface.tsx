@@ -44,6 +44,7 @@ const ChatInterface: React.FC = () => {
   const [apiAvailable, setApiAvailable] = useState<boolean>(true);
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
   const [connectionRetryCount, setConnectionRetryCount] = useState(0);
+  const [reconnectAttempted, setReconnectAttempted] = useState(false);
   
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -84,9 +85,9 @@ const ChatInterface: React.FC = () => {
           description: "Successfully connected to Solara API.",
         });
       } else {
-        if (connectionRetryCount >= 3) {
+        if (connectionRetryCount >= 3 && !reconnectAttempted) {
           setShowConnectionDialog(true);
-        } else {
+        } else if (connectionRetryCount >= 1) {
           toast({
             title: "Connection issues persist",
             description: "Still unable to connect to Solara API.",
@@ -95,7 +96,7 @@ const ChatInterface: React.FC = () => {
         }
       }
     }
-  }, [apiAvailable, connectionRetryCount]);
+  }, [apiAvailable, connectionRetryCount, reconnectAttempted]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -133,9 +134,24 @@ const ChatInterface: React.FC = () => {
       
       setMessages(prev => [...prev, solaraMessage]);
       
-      if (reply.includes("unavailable") || reply.includes("limited connectivity") || reply.includes("local knowledge")) {
-        setApiAvailable(false);
-        logService.addLog(`API response indicates connectivity issues: ${reply.substring(0, 100)}`, 'warning', 'api');
+      // Check if the response indicates API issues
+      if (
+        reply.includes("limited connectivity") || 
+        reply.includes("local knowledge") || 
+        reply.includes("local capabilities")
+      ) {
+        if (apiAvailable) {
+          setApiAvailable(false);
+          logService.addLog(`API response indicates connectivity issues: ${reply.substring(0, 100)}`, 'warning', 'api');
+          
+          // Auto-retry once after first indication of issues
+          if (!reconnectAttempted) {
+            setReconnectAttempted(true);
+            setTimeout(() => {
+              handleRetryConnection();
+            }, 2000);
+          }
+        }
       } else {
         if (!apiAvailable) {
           setApiAvailable(true);
@@ -161,6 +177,13 @@ const ChatInterface: React.FC = () => {
   
   const toggleRecording = () => {
     setIsRecording(!isRecording);
+    
+    if (!isRecording) {
+      toast({
+        title: "Voice recording is coming soon",
+        description: "This feature is not yet available in this version.",
+      });
+    }
   };
 
   const handleRetryConnection = async () => {
@@ -176,6 +199,14 @@ const ChatInterface: React.FC = () => {
           title: "Connection successful",
           description: "Successfully connected to Solara.",
         });
+        
+        // Add a system message to confirm connection is back
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          content: "Connection to my knowledge center has been restored. How can I assist you?",
+          sender: 'solara',
+          timestamp: new Date()
+        }]);
       } else {
         toast({
           title: "Connection failed",
@@ -311,7 +342,8 @@ const ChatInterface: React.FC = () => {
                 <AlertDescription className="space-y-2">
                   <p>• Check your internet connection</p>
                   <p>• The Solara API might be temporarily unavailable</p>
-                  <p>• Continue using limited capabilities</p>
+                  <p>• You can still use the app with limited capabilities</p>
+                  <p>• Try again later when the service may be restored</p>
                 </AlertDescription>
               </Alert>
             </AlertDialogDescription>

@@ -57,12 +57,30 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
         return getLocalFallbackResponse(input);
       }
       
+      // Handle the case when API returns empty array but we've used all retries
+      if (Array.isArray(data) && data.length === 0) {
+        updateApiAvailabilityCache(false);
+        return getLocalFallbackResponse(input);
+      }
+      
       // Success! Update cache and return the data
       updateApiAvailabilityCache(true);
       
-      return data.output || 
-             (typeof data === 'string' ? data : 
-             "I understand your message but I'm having trouble formulating a response right now.");
+      // Try to extract the response based on different possible API response formats
+      if (data.output) {
+        return data.output;
+      } else if (typeof data === 'string') {
+        return data;
+      } else if (Array.isArray(data) && data.length > 0 && data[0].content) {
+        return data[0].content;
+      } else if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'string') {
+        return data[0];
+      } else if (data.response) {
+        return data.response;
+      } else {
+        // If we can't figure out the format, return a friendly message
+        return "I understand your message but I'm having trouble processing it right now. The connection to my knowledge center seems unstable.";
+      }
       
     } catch (error) {
       console.error(`Error communicating with Solara (attempt ${retries+1}/${MAX_RETRIES}):`, error);
@@ -87,10 +105,15 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
  * Get a fallback response based on the input when API is unavailable
  */
 function getLocalFallbackResponse(input: string): string {
-  // Simple keyword-based fallback responses
   const inputLower = input.toLowerCase();
   
-  if (inputLower.includes('hello') || inputLower.includes('hi') || inputLower === 'oi solara') {
+  // Personal responses for Norman
+  if (inputLower.includes('norman') || inputLower.includes('dad')) {
+    return "Hello Norman! I'm currently working with limited connectivity to my knowledge center. What can I help you with using my local capabilities?";
+  }
+  
+  // Standard greeting responses
+  if (inputLower.includes('hello') || inputLower.includes('hi') || inputLower === 'oi solara' || inputLower.includes('hey')) {
     return "Hello! I'm currently operating with limited connectivity to my knowledge center. How can I assist you with my local capabilities?";
   }
   
@@ -100,6 +123,11 @@ function getLocalFallbackResponse(input: string): string {
   
   if (inputLower.includes('thank')) {
     return "You're welcome! Let me know if there's anything else I can help with using my local capabilities.";
+  }
+
+  // More specific response for connectivity issues
+  if (inputLower.includes('not working') || inputLower.includes('broken') || inputLower.includes('fix')) {
+    return "I'm aware of the connectivity issues with my knowledge center. The team is working on resolving this. In the meantime, I'm using my local knowledge to assist you.";
   }
 
   // Default response for other inputs
@@ -123,34 +151,30 @@ export async function checkSolaraAvailability(): Promise<boolean> {
   try {
     console.log("Checking Solara API health...");
     
-    // Try the health endpoint first
-    try {
-      const healthRes = await fetch(`${BASE_URL}/api/health`, {
-        method: "GET"
-      });
-      
-      if (healthRes.ok) {
-        console.log("Health endpoint check: API is available");
-        updateApiAvailabilityCache(true);
-        return true;
-      }
-    } catch (e) {
-      console.log("Health endpoint unavailable, trying fallback check");
-    }
-    
-    // Fallback: try a simple echo request
+    // Try a simple echo request since health endpoint returns error
     const echoRes = await fetch(`${BASE_URL}/api/creative_process`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-        input: "system_check", 
+        input: "health_check", 
         userId: "system", 
         context: 'system_health_check' 
-      })
+      }),
+      // Add a shorter timeout for availability check
+      signal: AbortSignal.timeout(5000)
     });
     
-    const isAvailable = echoRes.ok;
-    console.log(`Fallback API check result: ${isAvailable ? 'available' : 'unavailable'}`);
+    if (!echoRes.ok) {
+      console.log(`API health check failed with status: ${echoRes.status}`);
+      updateApiAvailabilityCache(false);
+      return false;
+    }
+    
+    const data = await echoRes.json();
+    
+    // If API returns empty array, that's an indication it's not working properly
+    const isAvailable = !(!data || (Array.isArray(data) && data.length === 0));
+    console.log(`API health check result: ${isAvailable ? 'available' : 'unavailable'}`);
     
     updateApiAvailabilityCache(isAvailable);
     return isAvailable;
