@@ -1,25 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import { Send, Mic, MicOff, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
-import Card from '../common/Card';
-import Button from '../common/Button';
-import Input from '../common/Input';
-import AnimatedTransition from '../common/AnimatedTransition';
-import { talkToSolara, checkSolaraAvailability, refreshApiStatus } from '@/api/solara';
-import { logService } from '../monitoring/LogMonitor';
-import { toast } from '@/components/ui/use-toast';
 import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+  talkToSolara, 
+  checkSolaraAvailability, 
+  refreshApiStatus, 
+  setOfflineMode, 
+  forceOfflineMode 
+} from '@/api/solara';
+import { logService } from '../monitoring/LogMonitor';
+
+// Import our new component files
+import MessageList from './MessageList';
+import MessageInput from './MessageInput';
+import ConnectionStatus from './ConnectionStatus';
+import ConnectionErrorDialog from './ConnectionErrorDialog';
 
 interface Message {
   id: string;
@@ -37,20 +31,15 @@ const ChatInterface: React.FC = () => {
       timestamp: new Date()
     }
   ]);
-  const [inputValue, setInputValue] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
   const [apiAvailable, setApiAvailable] = useState<boolean>(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(forceOfflineMode);
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
   const [connectionRetryCount, setConnectionRetryCount] = useState(0);
   const [reconnectAttempted, setReconnectAttempted] = useState(false);
   
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    scrollToBottom();
-    
+  useEffect(() => {
     const observer = new MutationObserver(() => {
       setDarkMode(document.documentElement.classList.contains('dark'));
     });
@@ -63,66 +52,45 @@ const ChatInterface: React.FC = () => {
     // Check the API availability when the component mounts
     checkSolaraAvailability().then(available => {
       setApiAvailable(available);
-      if (!available) {
-        logService.addLog("Initial API check: Solara API is unavailable", "warning", "api");
+      
+      // If API is unavailable on initial load, suggest offline mode
+      if (!available && !isOfflineMode) {
+        setTimeout(() => {
+          setShowConnectionDialog(true);
+        }, 500);
       }
     });
     
     return () => observer.disconnect();
   }, []);
-
-  // Scroll to bottom when messages change
-  React.useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
   
   // Show a status message when API availability changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (connectionRetryCount > 0) {
       if (apiAvailable) {
-        toast({
-          title: "Connection restored",
-          description: "Successfully connected to Solara API.",
-        });
+        logService.addLog(`Connection restored after ${connectionRetryCount} attempts`, 'success', 'api');
       } else {
-        if (connectionRetryCount >= 3 && !reconnectAttempted) {
+        if (connectionRetryCount >= 3 && !reconnectAttempted && !isOfflineMode) {
           setShowConnectionDialog(true);
-        } else if (connectionRetryCount >= 1) {
-          toast({
-            title: "Connection issues persist",
-            description: "Still unable to connect to Solara API.",
-            variant: "destructive",
-          });
         }
       }
     }
-  }, [apiAvailable, connectionRetryCount, reconnectAttempted]);
+  }, [apiAvailable, connectionRetryCount, reconnectAttempted, isOfflineMode]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isProcessing) return;
-    
+  const handleSendMessage = async (messageText: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: messageText,
       sender: 'user',
       timestamp: new Date()
     };
     
     setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
     setIsProcessing(true);
     
-    logService.addLog(`Sending user message: "${inputValue.substring(0, 50)}${inputValue.length > 50 ? '...' : ''}"`, 'info', 'chat');
+    logService.addLog(`Sending user message: "${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}"`, 'info', 'chat');
     
     try {
-      if (!apiAvailable) {
-        logService.addLog(`Attempting to use Solara API despite known connectivity issues`, 'warning', 'api');
-      }
-      
       const reply = await talkToSolara(userMessage.content);
       
       const solaraMessage: Message = {
@@ -135,28 +103,25 @@ const ChatInterface: React.FC = () => {
       setMessages(prev => [...prev, solaraMessage]);
       
       // Check if the response indicates API issues
-      if (
+      const isLocalResponse = 
         reply.includes("limited connectivity") || 
         reply.includes("local knowledge") || 
-        reply.includes("local capabilities")
-      ) {
-        if (apiAvailable) {
-          setApiAvailable(false);
-          logService.addLog(`API response indicates connectivity issues: ${reply.substring(0, 100)}`, 'warning', 'api');
-          
-          // Auto-retry once after first indication of issues
-          if (!reconnectAttempted) {
-            setReconnectAttempted(true);
-            setTimeout(() => {
-              handleRetryConnection();
-            }, 2000);
-          }
+        reply.includes("local capabilities") ||
+        reply.includes("offline mode");
+        
+      if (isLocalResponse && !isOfflineMode) {
+        setApiAvailable(false);
+        
+        // Auto-retry once after first indication of issues
+        if (!reconnectAttempted) {
+          setReconnectAttempted(true);
+          setTimeout(() => {
+            handleRetryConnection();
+          }, 2000);
         }
-      } else {
-        if (!apiAvailable) {
-          setApiAvailable(true);
-          logService.addLog(`API seems to be working again`, 'success', 'api');
-        }
+      } else if (!isLocalResponse && !apiAvailable && !isOfflineMode) {
+        setApiAvailable(true);
+        logService.addLog(`API seems to be working again`, 'success', 'api');
       }
     } catch (error) {
       console.error("API Error:", error);
@@ -174,17 +139,6 @@ const ChatInterface: React.FC = () => {
       setIsProcessing(false);
     }
   };
-  
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    
-    if (!isRecording) {
-      toast({
-        title: "Voice recording is coming soon",
-        description: "This feature is not yet available in this version.",
-      });
-    }
-  };
 
   const handleRetryConnection = async () => {
     logService.addLog("Manually checking Solara API connection", "info", "api");
@@ -195,10 +149,8 @@ const ChatInterface: React.FC = () => {
       setApiAvailable(available);
       
       if (available) {
-        toast({
-          title: "Connection successful",
-          description: "Successfully connected to Solara.",
-        });
+        setIsOfflineMode(false);
+        setOfflineMode(false);
         
         // Add a system message to confirm connection is back
         setMessages(prev => [...prev, {
@@ -207,157 +159,72 @@ const ChatInterface: React.FC = () => {
           sender: 'solara',
           timestamp: new Date()
         }]);
-      } else {
-        toast({
-          title: "Connection failed",
-          description: "Still having trouble connecting to Solara.",
-          variant: "destructive",
-        });
+      } else if (connectionRetryCount >= 2) {
+        // After a couple failed retries, suggest offline mode
+        setShowConnectionDialog(true);
       }
     } catch (error) {
       console.error("Error during connection retry:", error);
       setApiAvailable(false);
-      toast({
-        title: "Connection error",
-        description: "An error occurred while checking the connection.",
-        variant: "destructive",
-      });
+      
+      if (connectionRetryCount >= 2) {
+        setShowConnectionDialog(true);
+      }
     }
+  };
+  
+  const toggleOfflineMode = (enabled: boolean) => {
+    setIsOfflineMode(enabled);
+    setOfflineMode(enabled);
+    
+    if (enabled) {
+      // Add a system message to confirm offline mode
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        content: "Offline mode enabled. I'm now using enhanced local responses to assist you.",
+        sender: 'solara',
+        timestamp: new Date()
+      }]);
+      
+      logService.addLog("Offline mode enabled by user", "info", "system");
+    } else {
+      // If turning off offline mode, attempt to check the API
+      handleRetryConnection();
+    }
+  };
+  
+  const handleEnableOfflineMode = () => {
+    toggleOfflineMode(true);
+    setShowConnectionDialog(false);
   };
 
   return (
     <div className="flex flex-col h-full">
-      {!apiAvailable && (
-        <AnimatedTransition show={true} type="fade">
-          <div className="p-2 bg-amber-500/20 dark:bg-amber-900/30 border-b border-amber-500/30 dark:border-amber-700/30 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="text-amber-500 dark:text-amber-400" size={18} />
-              <span>Connection to Solara is limited. Responses may be affected.</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRetryConnection}
-              icon={<RefreshCw size={16} className={connectionRetryCount > 0 ? "animate-spin" : ""} />}
-            >
-              Retry
-            </Button>
-          </div>
-        </AnimatedTransition>
-      )}
+      <ConnectionStatus
+        apiAvailable={apiAvailable}
+        connectionRetryCount={connectionRetryCount}
+        handleRetryConnection={handleRetryConnection}
+        isOfflineMode={isOfflineMode}
+        toggleOfflineMode={toggleOfflineMode}
+      />
       
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${!apiAvailable ? 'pb-2' : ''}`}>
-        {messages.map((message) => (
-          <AnimatedTransition 
-            key={message.id} 
-            show={true} 
-            type="fade"
-          >
-            <div
-              className={cn(
-                "max-w-[80%] mb-4 animate-fade-in",
-                message.sender === 'user' ? "ml-auto" : "mr-auto"
-              )}
-            >
-              <Card 
-                className={cn(
-                  "shadow-sm",
-                  message.sender === 'user' 
-                    ? "bg-primary text-white dark:bg-primary/90" 
-                    : "glass border border-white/20 dark:border-white/10"
-                )}
-              >
-                <div className="space-y-2">
-                  <p>{message.content}</p>
-                  <p className="text-xs opacity-70">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              </Card>
-            </div>
-          </AnimatedTransition>
-        ))}
-        {isProcessing && (
-          <AnimatedTransition show={true} type="fade">
-            <div className="max-w-[80%] mr-auto">
-              <Card className="glass border border-white/20 dark:border-white/10">
-                <div className="flex items-center space-x-2">
-                  <Loader2 className="animate-spin" size={18} />
-                  <p>Solara is thinking...</p>
-                </div>
-              </Card>
-            </div>
-          </AnimatedTransition>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+      <MessageList 
+        messages={messages} 
+        isProcessing={isProcessing} 
+      />
       
-      <div className="p-4 border-t backdrop-blur-sm bg-white/50 dark:bg-black/30">
-        <div className="flex space-x-2">
-          <Button
-            variant={isRecording ? "primary" : "outline"}
-            onClick={toggleRecording}
-            className="flex-shrink-0"
-            icon={isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-          >
-            {isRecording ? "Stop" : "Voice"}
-          </Button>
-          
-          <Input
-            placeholder="Type your message..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            className={cn(
-              "flex-1",
-              darkMode && "text-blue-300 placeholder:text-blue-500/60"
-            )}
-          />
-          
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isProcessing}
-            className="flex-shrink-0"
-            icon={<Send size={18} />}
-          >
-            Send
-          </Button>
-        </div>
-      </div>
+      <MessageInput 
+        onSendMessage={handleSendMessage}
+        isProcessing={isProcessing}
+        darkMode={darkMode}
+      />
       
-      {/* Connection Dialog */}
-      <AlertDialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Connection Issues</AlertDialogTitle>
-            <AlertDialogDescription>
-              We're having trouble connecting to Solara's knowledge center. Responses will be limited to local capabilities.
-              <Alert className="mt-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-                <AlertTitle>What you can try:</AlertTitle>
-                <AlertDescription className="space-y-2">
-                  <p>• Check your internet connection</p>
-                  <p>• The Solara API might be temporarily unavailable</p>
-                  <p>• You can still use the app with limited capabilities</p>
-                  <p>• Try again later when the service may be restored</p>
-                </AlertDescription>
-              </Alert>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowConnectionDialog(false)}>
-              Continue with limited features
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleRetryConnection}>
-              Try Again
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConnectionErrorDialog
+        open={showConnectionDialog}
+        onOpenChange={setShowConnectionDialog}
+        onRetry={handleRetryConnection}
+        onEnableOfflineMode={handleEnableOfflineMode}
+      />
     </div>
   );
 };

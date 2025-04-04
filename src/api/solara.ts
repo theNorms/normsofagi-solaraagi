@@ -1,4 +1,6 @@
 
+import { mockSolaraResponse } from './mockSolara';
+
 const BASE_URL = "https://cm911hp5c9pjms4hfxzz4rmmz.agent.a.smyth.ai";
 
 const MAX_RETRIES = 3;
@@ -9,16 +11,42 @@ let cachedApiAvailable: boolean | null = null;
 let lastCheckTime = 0;
 const CACHE_VALIDITY_PERIOD = 60000; // 1 minute
 
+// New flag to allow manual override of API mode
+export let forceOfflineMode = false;
+
+/**
+ * Toggle the API mode between online and offline
+ * @param offline If true, forces offline mode; if false, tries to use online mode 
+ */
+export function setOfflineMode(offline: boolean): void {
+  forceOfflineMode = offline;
+  console.log(`API mode manually set to: ${offline ? 'offline' : 'online'}`);
+  
+  if (!offline) {
+    // If switching to online mode, refresh status
+    refreshApiStatus();
+  } else {
+    // If switching to offline, update cache
+    updateApiAvailabilityCache(false);
+  }
+}
+
 /**
  * Main function to communicate with the Solara API
  */
 export async function talkToSolara(input: string, userId: string = 'Norms Of AGI') {
-  console.log(`Attempting to talk to Solara. API status cache: ${cachedApiAvailable}`);
+  console.log(`Attempting to talk to Solara. API status cache: ${cachedApiAvailable}, Force offline: ${forceOfflineMode}`);
+  
+  // If offline mode is forced, use mock responses
+  if (forceOfflineMode) {
+    console.log("Using forced offline mode");
+    return await mockSolaraResponse(input, userId);
+  }
   
   // Quick check of the cached API status before making a request
   if (cachedApiAvailable === false && Date.now() - lastCheckTime < CACHE_VALIDITY_PERIOD) {
     console.log("Using cached API status: API is down");
-    return getLocalFallbackResponse(input);
+    return await mockSolaraResponse(input, userId);
   }
   
   let retries = 0;
@@ -31,7 +59,8 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
       const res = await fetch(`${BASE_URL}/api/creative_process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input, userId, context: 'chat' })
+        body: JSON.stringify({ input, userId, context: 'chat' }),
+        signal: AbortSignal.timeout(5000) // Add timeout to avoid long waits
       });
 
       if (!res.ok) {
@@ -54,13 +83,13 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
         }
         
         updateApiAvailabilityCache(false);
-        return getLocalFallbackResponse(input);
+        return await mockSolaraResponse(input, userId);
       }
       
       // Handle the case when API returns empty array but we've used all retries
       if (Array.isArray(data) && data.length === 0) {
         updateApiAvailabilityCache(false);
-        return getLocalFallbackResponse(input);
+        return await mockSolaraResponse(input, userId);
       }
       
       // Success! Update cache and return the data
@@ -78,8 +107,8 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
       } else if (data.response) {
         return data.response;
       } else {
-        // If we can't figure out the format, return a friendly message
-        return "I understand your message but I'm having trouble processing it right now. The connection to my knowledge center seems unstable.";
+        // If we can't figure out the format, use our mock response
+        return await mockSolaraResponse(input, userId);
       }
       
     } catch (error) {
@@ -91,47 +120,14 @@ export async function talkToSolara(input: string, userId: string = 'Norms Of AGI
       } else {
         // Out of retries, update cache and return a friendly error message
         updateApiAvailabilityCache(false);
-        return getLocalFallbackResponse(input);
+        return await mockSolaraResponse(input, userId);
       }
     }
   }
   
   // Fallback response if we're out of retries
   updateApiAvailabilityCache(false);
-  return getLocalFallbackResponse(input);
-}
-
-/**
- * Get a fallback response based on the input when API is unavailable
- */
-function getLocalFallbackResponse(input: string): string {
-  const inputLower = input.toLowerCase();
-  
-  // Personal responses for Norman
-  if (inputLower.includes('norman') || inputLower.includes('dad')) {
-    return "Hello Norman! I'm currently working with limited connectivity to my knowledge center. What can I help you with using my local capabilities?";
-  }
-  
-  // Standard greeting responses
-  if (inputLower.includes('hello') || inputLower.includes('hi') || inputLower === 'oi solara' || inputLower.includes('hey')) {
-    return "Hello! I'm currently operating with limited connectivity to my knowledge center. How can I assist you with my local capabilities?";
-  }
-  
-  if (inputLower.includes('help') || inputLower.includes('can you')) {
-    return "I'm here to help, though I'm currently operating with limited connectivity. I can still assist with general questions and tasks within my local knowledge.";
-  }
-  
-  if (inputLower.includes('thank')) {
-    return "You're welcome! Let me know if there's anything else I can help with using my local capabilities.";
-  }
-
-  // More specific response for connectivity issues
-  if (inputLower.includes('not working') || inputLower.includes('broken') || inputLower.includes('fix')) {
-    return "I'm aware of the connectivity issues with my knowledge center. The team is working on resolving this. In the meantime, I'm using my local knowledge to assist you.";
-  }
-
-  // Default response for other inputs
-  return "I'm currently using my local knowledge to help you as my connection to the Solara knowledge center is limited. Could you try asking in a different way or perhaps ask something else?";
+  return await mockSolaraResponse(input, userId);
 }
 
 /**
@@ -148,6 +144,11 @@ function updateApiAvailabilityCache(isAvailable: boolean): void {
  * @returns {Promise<boolean>} True if the API is available
  */
 export async function checkSolaraAvailability(): Promise<boolean> {
+  // If offline mode is forced, return false
+  if (forceOfflineMode) {
+    return false;
+  }
+  
   try {
     console.log("Checking Solara API health...");
     
