@@ -1,13 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Send, Mic, MicOff, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import AnimatedTransition from '../common/AnimatedTransition';
-import { talkToSolara } from '@/api/solara';
+import { talkToSolara, checkSolaraAvailability } from '@/api/solara';
 import { logService } from '../monitoring/LogMonitor';
+import { toast } from '@/components/ui/use-toast';
 
 interface Message {
   id: string;
@@ -29,13 +29,13 @@ const ChatInterface: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
+  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
   
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     scrollToBottom();
     
-    // Listen for dark mode changes
     const observer = new MutationObserver(() => {
       setDarkMode(document.documentElement.classList.contains('dark'));
     });
@@ -55,7 +55,6 @@ const ChatInterface: React.FC = () => {
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isProcessing) return;
     
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue,
@@ -67,10 +66,13 @@ const ChatInterface: React.FC = () => {
     setInputValue('');
     setIsProcessing(true);
     
-    // Log the message to the monitoring system
     logService.addLog(`Sending user message: "${inputValue.substring(0, 50)}${inputValue.length > 50 ? '...' : ''}"`, 'info', 'chat');
     
     try {
+      if (!apiAvailable) {
+        logService.addLog(`Attempting to use Solara API despite known connectivity issues`, 'warning', 'api');
+      }
+      
       const reply = await talkToSolara(userMessage.content);
       
       const solaraMessage: Message = {
@@ -82,10 +84,11 @@ const ChatInterface: React.FC = () => {
       
       setMessages(prev => [...prev, solaraMessage]);
       
-      // Log the response to the monitoring system
-      if (reply.includes("unavailable") || reply.includes("issues") || reply.includes("failed")) {
-        logService.addLog(`API response issue: ${reply.substring(0, 100)}`, 'warning', 'api');
+      if (reply.includes("unavailable") || reply.includes("connection issues")) {
+        setApiAvailable(false);
+        logService.addLog(`API response indicates connectivity issues: ${reply.substring(0, 100)}`, 'warning', 'api');
       } else {
+        setApiAvailable(true);
         logService.addLog(`Received response from Solara`, 'success', 'api');
       }
     } catch (error) {
@@ -94,10 +97,12 @@ const ChatInterface: React.FC = () => {
       
       setMessages(prev => [...prev, {
         id: (Date.now() + 2).toString(),
-        content: "Sorry, I'm having trouble reaching the orchestrator.",
+        content: "I'm having trouble connecting to my knowledge center. Let me help with what I know locally.",
         sender: 'solara',
         timestamp: new Date()
       }]);
+      
+      setApiAvailable(false);
     } finally {
       setIsProcessing(false);
     }
@@ -105,12 +110,49 @@ const ChatInterface: React.FC = () => {
   
   const toggleRecording = () => {
     setIsRecording(!isRecording);
-    // In a real app, we would start/stop voice recording here
+  };
+
+  const handleRetryConnection = async () => {
+    logService.addLog("Manually checking Solara API connection", "info", "api");
+    const available = await checkSolaraAvailability();
+    setApiAvailable(available);
+    
+    if (available) {
+      toast({
+        title: "Connection successful",
+        description: "Successfully connected to Solara.",
+      });
+    } else {
+      toast({
+        title: "Connection failed",
+        description: "Still having trouble connecting to Solara.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {!apiAvailable && (
+        <AnimatedTransition show={true} type="fade">
+          <div className="p-2 bg-amber-500/20 border-b border-amber-500/30 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="text-amber-500" size={18} />
+              <span>Connection to Solara is limited. Responses may be affected.</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetryConnection}
+              icon={<RefreshCw size={16} />}
+            >
+              Retry
+            </Button>
+          </div>
+        </AnimatedTransition>
+      )}
+      
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${!apiAvailable ? 'pb-2' : ''}`}>
         {messages.map((message) => (
           <AnimatedTransition 
             key={message.id} 
