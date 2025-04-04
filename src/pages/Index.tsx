@@ -8,6 +8,7 @@ import WorkflowCreator from '@/components/workflow/WorkflowCreator';
 import FineTuner from '@/components/fineTuning/FineTuner';
 import IntegrationPanel from '@/components/integration/IntegrationPanel';
 import MonitoringDashboard from '@/components/monitoring/MonitoringDashboard';
+import LogMonitor from '@/components/monitoring/LogMonitor';
 
 const Index = () => {
   const [showSidebar, setShowSidebar] = useState(true);
@@ -31,6 +32,8 @@ const Index = () => {
         return <IntegrationPanel />;
       case 'monitoring':
         return <MonitoringDashboard />;
+      case 'logs':
+        return <LogMonitor />;
       case 'settings':
         return (
           <div className="h-full flex items-center justify-center">

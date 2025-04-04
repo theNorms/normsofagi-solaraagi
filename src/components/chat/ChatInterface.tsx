@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
@@ -6,6 +5,7 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import AnimatedTransition from '../common/AnimatedTransition';
+import { talkToSolara } from '@/api/solara';
 
 interface Message {
   id: string;
@@ -50,7 +50,7 @@ const ChatInterface: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim() || isProcessing) return;
     
     // Add user message
@@ -65,28 +65,18 @@ const ChatInterface: React.FC = () => {
     setInputValue('');
     setIsProcessing(true);
     
-    fetch("https://cm911hp5c9pjms4hfxzz4rmmz.agent.a.smyth.ai/api/creative_process", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        input: inputValue,
-        userId: "Norms Of AGI", // Updated as requested
-        context: "chat"
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
+    try {
+      const reply = await talkToSolara(userMessage.content);
+      
       const solaraMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.output || "No response from Solara.",
+        content: reply,
         sender: 'solara',
         timestamp: new Date()
       };
+      
       setMessages(prev => [...prev, solaraMessage]);
-    })
-    .catch(error => {
+    } catch (error) {
       console.error("API Error:", error);
       setMessages(prev => [...prev, {
         id: (Date.now() + 2).toString(),
@@ -94,10 +84,9 @@ const ChatInterface: React.FC = () => {
         sender: 'solara',
         timestamp: new Date()
       }]);
-    })
-    .finally(() => {
+    } finally {
       setIsProcessing(false);
-    });
+    }
   };
   
   const toggleRecording = () => {
