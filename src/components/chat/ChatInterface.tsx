@@ -72,7 +72,7 @@ const ChatInterface: React.FC = () => {
       },
       body: JSON.stringify({
         input: inputValue,
-        userId: "norman", // or dynamic user ID
+        userId: "Norms Of AGI", // Updated as requested
         context: "chat"
       })
     })
