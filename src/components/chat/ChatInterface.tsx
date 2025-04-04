@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
@@ -65,18 +64,8 @@ const ChatInterface: React.FC = () => {
     setInputValue('');
     setIsProcessing(true);
     
-    // Simulate Solara response after delay
-    setTimeout(() => {
-      const solaraMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "I'm processing your request. This is a simulated response as we're just building the UI prototype.",
-        sender: 'solara',
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, solaraMessage]);
-      setIsProcessing(false);
-    }, 1500);
+    // Code replaced as requested by the user
+    
   };
   
   const toggleRecording = () => {
