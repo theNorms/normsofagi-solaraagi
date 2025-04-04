@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Send, Mic, MicOff, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -5,9 +6,20 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import AnimatedTransition from '../common/AnimatedTransition';
-import { talkToSolara, checkSolaraAvailability } from '@/api/solara';
+import { talkToSolara, checkSolaraAvailability, refreshApiStatus } from '@/api/solara';
 import { logService } from '../monitoring/LogMonitor';
 import { toast } from '@/components/ui/use-toast';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface Message {
   id: string;
@@ -30,6 +42,8 @@ const ChatInterface: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
   const [apiAvailable, setApiAvailable] = useState<boolean>(true);
+  const [showConnectionDialog, setShowConnectionDialog] = useState(false);
+  const [connectionRetryCount, setConnectionRetryCount] = useState(0);
   
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -45,8 +59,43 @@ const ChatInterface: React.FC = () => {
       attributeFilter: ['class'],
     });
     
+    // Check the API availability when the component mounts
+    checkSolaraAvailability().then(available => {
+      setApiAvailable(available);
+      if (!available) {
+        logService.addLog("Initial API check: Solara API is unavailable", "warning", "api");
+      }
+    });
+    
     return () => observer.disconnect();
+  }, []);
+
+  // Scroll to bottom when messages change
+  React.useEffect(() => {
+    scrollToBottom();
   }, [messages]);
+  
+  // Show a status message when API availability changes
+  React.useEffect(() => {
+    if (connectionRetryCount > 0) {
+      if (apiAvailable) {
+        toast({
+          title: "Connection restored",
+          description: "Successfully connected to Solara API.",
+        });
+      } else {
+        if (connectionRetryCount >= 3) {
+          setShowConnectionDialog(true);
+        } else {
+          toast({
+            title: "Connection issues persist",
+            description: "Still unable to connect to Solara API.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  }, [apiAvailable, connectionRetryCount]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,12 +133,14 @@ const ChatInterface: React.FC = () => {
       
       setMessages(prev => [...prev, solaraMessage]);
       
-      if (reply.includes("unavailable") || reply.includes("connection issues")) {
+      if (reply.includes("unavailable") || reply.includes("limited connectivity") || reply.includes("local knowledge")) {
         setApiAvailable(false);
         logService.addLog(`API response indicates connectivity issues: ${reply.substring(0, 100)}`, 'warning', 'api');
       } else {
-        setApiAvailable(true);
-        logService.addLog(`Received response from Solara`, 'success', 'api');
+        if (!apiAvailable) {
+          setApiAvailable(true);
+          logService.addLog(`API seems to be working again`, 'success', 'api');
+        }
       }
     } catch (error) {
       console.error("API Error:", error);
@@ -114,18 +165,30 @@ const ChatInterface: React.FC = () => {
 
   const handleRetryConnection = async () => {
     logService.addLog("Manually checking Solara API connection", "info", "api");
-    const available = await checkSolaraAvailability();
-    setApiAvailable(available);
+    setConnectionRetryCount(prev => prev + 1);
     
-    if (available) {
+    try {
+      const available = await refreshApiStatus();
+      setApiAvailable(available);
+      
+      if (available) {
+        toast({
+          title: "Connection successful",
+          description: "Successfully connected to Solara.",
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: "Still having trouble connecting to Solara.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error during connection retry:", error);
+      setApiAvailable(false);
       toast({
-        title: "Connection successful",
-        description: "Successfully connected to Solara.",
-      });
-    } else {
-      toast({
-        title: "Connection failed",
-        description: "Still having trouble connecting to Solara.",
+        title: "Connection error",
+        description: "An error occurred while checking the connection.",
         variant: "destructive",
       });
     }
@@ -135,16 +198,16 @@ const ChatInterface: React.FC = () => {
     <div className="flex flex-col h-full">
       {!apiAvailable && (
         <AnimatedTransition show={true} type="fade">
-          <div className="p-2 bg-amber-500/20 border-b border-amber-500/30 flex items-center justify-between">
+          <div className="p-2 bg-amber-500/20 dark:bg-amber-900/30 border-b border-amber-500/30 dark:border-amber-700/30 flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="text-amber-500" size={18} />
+              <AlertTriangle className="text-amber-500 dark:text-amber-400" size={18} />
               <span>Connection to Solara is limited. Responses may be affected.</span>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleRetryConnection}
-              icon={<RefreshCw size={16} />}
+              icon={<RefreshCw size={16} className={connectionRetryCount > 0 ? "animate-spin" : ""} />}
             >
               Retry
             </Button>
@@ -169,8 +232,8 @@ const ChatInterface: React.FC = () => {
                 className={cn(
                   "shadow-sm",
                   message.sender === 'user' 
-                    ? "bg-primary text-white" 
-                    : "glass border border-white/20"
+                    ? "bg-primary text-white dark:bg-primary/90" 
+                    : "glass border border-white/20 dark:border-white/10"
                 )}
               >
                 <div className="space-y-2">
@@ -186,7 +249,7 @@ const ChatInterface: React.FC = () => {
         {isProcessing && (
           <AnimatedTransition show={true} type="fade">
             <div className="max-w-[80%] mr-auto">
-              <Card className="glass border border-white/20">
+              <Card className="glass border border-white/20 dark:border-white/10">
                 <div className="flex items-center space-x-2">
                   <Loader2 className="animate-spin" size={18} />
                   <p>Solara is thinking...</p>
@@ -235,6 +298,34 @@ const ChatInterface: React.FC = () => {
           </Button>
         </div>
       </div>
+      
+      {/* Connection Dialog */}
+      <AlertDialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Connection Issues</AlertDialogTitle>
+            <AlertDialogDescription>
+              We're having trouble connecting to Solara's knowledge center. Responses will be limited to local capabilities.
+              <Alert className="mt-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+                <AlertTitle>What you can try:</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>• Check your internet connection</p>
+                  <p>• The Solara API might be temporarily unavailable</p>
+                  <p>• Continue using limited capabilities</p>
+                </AlertDescription>
+              </Alert>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowConnectionDialog(false)}>
+              Continue with limited features
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleRetryConnection}>
+              Try Again
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
