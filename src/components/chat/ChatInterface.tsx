@@ -10,7 +10,7 @@ import AnimatedTransition from '../common/AnimatedTransition';
 interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'luna';
+  sender: 'user' | 'solara';
   timestamp: Date;
 }
 
@@ -18,8 +18,8 @@ const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hello, I'm Luna. How can I help you today?",
-      sender: 'luna',
+      content: "Hello, I'm Solara. How can I help you today?",
+      sender: 'solara',
       timestamp: new Date()
     }
   ]);
@@ -65,16 +65,16 @@ const ChatInterface: React.FC = () => {
     setInputValue('');
     setIsProcessing(true);
     
-    // Simulate Luna response after delay
+    // Simulate Solara response after delay
     setTimeout(() => {
-      const lunaMessage: Message = {
+      const solaraMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: "I'm processing your request. This is a simulated response as we're just building the UI prototype.",
-        sender: 'luna',
+        sender: 'solara',
         timestamp: new Date()
       };
       
-      setMessages(prev => [...prev, lunaMessage]);
+      setMessages(prev => [...prev, solaraMessage]);
       setIsProcessing(false);
     }, 1500);
   };
@@ -123,7 +123,7 @@ const ChatInterface: React.FC = () => {
               <Card className="glass border border-white/20">
                 <div className="flex items-center space-x-2">
                   <Loader2 className="animate-spin" size={18} />
-                  <p>Luna is thinking...</p>
+                  <p>Solara is thinking...</p>
                 </div>
               </Card>
             </div>

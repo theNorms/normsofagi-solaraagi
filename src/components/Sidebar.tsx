@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       <div className="p-4 border-t bg-sidebar">
         <div className="rounded-lg p-4 text-xs text-center bg-secondary">
-          <p className="font-medium">Luna Automator</p>
+          <p className="font-medium">Solara Automator</p>
           <p className="text-muted-foreground">Version 1.0.0</p>
         </div>
       </div>

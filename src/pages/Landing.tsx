@@ -29,7 +29,7 @@ const Landing: React.FC = () => {
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
                 Build, Deploy, and Manage AI Agents with
-                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Luna</span>
+                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Solara</span>
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-lg">
@@ -60,7 +60,7 @@ const Landing: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl opacity-20 blur-xl animate-pulse-slow"></div>
               <img 
                 src="/lovable-uploads/68ca9d66-c2ef-4e4e-8ff9-a87c0fe7c58c.png" 
-                alt="Luna AI Platform" 
+                alt="Solara AI Platform" 
                 className="relative w-full max-w-md mx-auto rounded-lg shadow-2xl animate-float"
               />
             </div>
@@ -149,7 +149,7 @@ const Landing: React.FC = () => {
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Transform Your AI Development Process?</h2>
           <p className="text-lg mb-8 opacity-90 max-w-2xl mx-auto">
-            Start building AI agents with Luna's automated orchestration platform today.
+            Start building AI agents with Solara's automated orchestration platform today.
           </p>
           
           <Link to="/app">
@@ -158,7 +158,7 @@ const Landing: React.FC = () => {
               size="lg"
               className="bg-white text-primary hover:bg-white/90"
             >
-              Launch Luna
+              Launch Solara
             </Button>
           </Link>
         </div>
@@ -171,17 +171,17 @@ const Landing: React.FC = () => {
             <div className="flex items-center mb-6 md:mb-0">
               <img 
                 src="/lovable-uploads/68ca9d66-c2ef-4e4e-8ff9-a87c0fe7c58c.png" 
-                alt="Luna Logo" 
+                alt="Solara Logo" 
                 className="w-10 h-10 rounded-full mr-3" 
               />
               <div>
-                <div className="font-bold text-lg">Luna AI</div>
+                <div className="font-bold text-lg">Solara AI</div>
                 <div className="text-xs text-muted-foreground">by Norman dela Paz Tabora</div>
               </div>
             </div>
             
             <div className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} LunaTech AI Development. All rights reserved.
+              &copy; {new Date().getFullYear()} SolaraTech AI Development. All rights reserved.
             </div>
           </div>
         </div>

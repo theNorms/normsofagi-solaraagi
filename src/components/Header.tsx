@@ -44,12 +44,12 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, className }) => {
         <div className="flex items-center space-x-3">
           <img 
             src="/lovable-uploads/68ca9d66-c2ef-4e4e-8ff9-a87c0fe7c58c.png" 
-            alt="Luna Logo" 
+            alt="Solara Logo" 
             className="w-10 h-10 rounded-full"
           />
           <div className="flex flex-col">
             <span className="font-medium text-xs md:text-sm">AUTOMATED AI DEVELOPMENT ORCHESTRATION TOOL</span>
-            <span className="text-xs text-muted-foreground">from LunaTech AI Development by Norman dela Paz Tabora</span>
+            <span className="text-xs text-muted-foreground">from SolaraTech AI Development by Norman dela Paz Tabora</span>
           </div>
         </div>
       </div>
