@@ -1,14 +1,18 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Sun, Moon, Volume2, VolumeX } from 'lucide-react';
 import ChatInterface from '@/components/chat/ChatInterface';
 import { Button } from '@/components/ui/button';
+import { speechManager } from '@/utils/voiceUtils';
+import { toast } from '@/components/ui/use-toast';
 
 const ChatPage: React.FC = () => {
   const [darkMode, setDarkMode] = React.useState(
     document.documentElement.classList.contains('dark')
   );
+  
+  const [voiceEnabled, setVoiceEnabled] = React.useState(true);
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -17,6 +21,24 @@ const ChatPage: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+  };
+  
+  const toggleVoice = () => {
+    // If currently enabled, stop any active speech
+    if (voiceEnabled) {
+      speechManager.stop();
+      toast({
+        title: "Voice responses disabled",
+        description: "Text-to-speech has been turned off.",
+      });
+    } else {
+      toast({
+        title: "Voice responses enabled",
+        description: "Solara can now speak responses aloud.",
+      });
+    }
+    
+    setVoiceEnabled(!voiceEnabled);
   };
 
   return (
@@ -40,13 +62,24 @@ const ChatPage: React.FC = () => {
           </div>
         </div>
         
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleDarkMode}
-        >
-          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={toggleVoice}
+            title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+          >
+            {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleDarkMode}
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </Button>
+        </div>
       </header>
       
       <div className="flex-1 h-[calc(100vh-4rem)]">
@@ -57,3 +90,4 @@ const ChatPage: React.FC = () => {
 };
 
 export default ChatPage;
+
